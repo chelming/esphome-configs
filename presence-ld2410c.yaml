@@ -1,0 +1,337 @@
+# This uses an LD2410c and an ESP32-C3-Supermini
+# This case was used: https://www.printables.com/model/767970-presence-sensor-case-esp32-c3-super-mini-ld2410c-r
+# Pin 20 goes to TX on the LD2410c
+# Pin 21 goes to RX on the LD2410c
+
+esphome:
+  name: presence-living-room
+  friendly_name: Presence living room
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: ""
+
+ota:
+  password: ""
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  output_power: 8.5
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "${name}"
+    password: ""
+
+captive_portal:
+
+globals:
+  - id: cycleCounter
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: button_press_timestamp
+    restore_value: no
+    type: uint32_t
+    initial_value: '0'
+    
+uart:
+  tx_pin: GPIO21
+  rx_pin: GPIO20
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
+
+# Numbers For Configuration
+number:
+  - platform: ld2410
+    timeout:
+      name: Radar Timeout
+    max_move_distance_gate:
+      name: Radar Max Move Distance
+    max_still_distance_gate:
+      name: Radar Max Still Distance
+    g0:
+      move_threshold:
+        name: g0 move threshold
+      still_threshold:
+        name: g0 still threshold
+    g1:
+      move_threshold:
+        name: g1 move threshold
+      still_threshold:
+        name: g1 still threshold
+    g2:
+      move_threshold:
+        name: g2 move threshold
+      still_threshold:
+        name: g2 still threshold
+    g3:
+      move_threshold:
+        name: g3 move threshold
+      still_threshold:
+        name: g3 still threshold
+    g4:
+      move_threshold:
+        name: g4 move threshold
+      still_threshold:
+        name: g4 still threshold
+    g5:
+      move_threshold:
+        name: g5 move threshold
+      still_threshold:
+        name: g5 still threshold
+    g6:
+      move_threshold:
+        name: g6 move threshold
+      still_threshold:
+        name: g6 still threshold
+    g7:
+      move_threshold:
+        name: g7 move threshold
+      still_threshold:
+        name: g7 still threshold
+    g8:
+      move_threshold:
+        name: g8 move threshold
+      still_threshold:
+        name: g8 still threshold
+
+  # Setting start of zone 1 occupancy
+  - platform: template
+    name: "Radar Zone 1 Start"
+    id: radar_z1_start
+    device_class: distance
+    min_value: 0
+    max_value: 800
+    step: 1
+    mode: box
+    update_interval: never
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    icon: "mdi:arrow-collapse-right"
+    entity_category: CONFIG
+    unit_of_measurement: "in"
+
+  # Setting ending of zone 1 occupancy
+  - platform: template
+    name: "Radar End Zone 1"
+    id: radar_z1_end
+    device_class: distance
+    min_value: 0
+    max_value: 800
+    step: 1
+    mode: box
+    update_interval: never
+    optimistic: true
+    restore_value: true
+    initial_value: 50
+    icon: "mdi:arrow-collapse-right"
+    entity_category: CONFIG
+    unit_of_measurement: "in"
+
+  # Setting ending of zone 2 occupancy
+  - platform: template
+    name: "Radar End Zone 2"
+    id: radar_z2_end
+    device_class: distance
+    min_value: 0
+    max_value: 800
+    step: 1
+    mode: box
+    update_interval: never
+    optimistic: true
+    restore_value: true
+    initial_value: 150
+    icon: "mdi:arrow-collapse-right"
+    entity_category: CONFIG
+    unit_of_measurement: "in"
+
+  # Setting ending of zone 3 occupancy
+  - platform: template
+    name: "Radar End Zone 3"
+    id: radar_z3_end
+    device_class: distance
+    min_value: 0
+    max_value: 800
+    step: 1
+    mode: box
+    update_interval: never
+    optimistic: true
+    restore_value: true
+    initial_value: 250
+    icon: "mdi:arrow-collapse-right"
+    entity_category: CONFIG
+    unit_of_measurement: "in"
+
+binary_sensor:
+  - platform: status
+    name: Online
+    id: ink_ha_connected
+  - platform: ld2410
+    has_target:
+      name: Radar Target
+      id: radar_has_target
+    has_moving_target:
+      name: Radar Moving Target
+      id: radar_has_moving_target
+    has_still_target:
+      name: Radar Still Target
+      id: radar_has_still_target
+
+  ## Set Up Radar Zones Based On Distance
+  - platform: template
+    name: "Radar Zone 1 Occupancy"
+    id: radar_zone_1_occupancy
+    device_class: occupancy
+    icon: mdi:motion-sensor
+    lambda: |-
+      if ((id(radar_has_target).state) && ((id(radar_detection_distance).state < (id(radar_z1_end).state*2.54)) && (id(radar_detection_distance).state > (id(radar_z1_start).state*2.54)))){
+        return true;
+      } else {
+        return false;
+      }
+
+  - platform: template
+    name: "Radar Zone 2 Occupancy"
+    id: radar_zone_2_occupancy
+    device_class: occupancy
+    icon: mdi:motion-sensor
+    lambda: |-
+      if ((id(radar_has_target).state) && (((id(radar_z1_end).state*2.54) < id(radar_detection_distance).state) && (id(radar_detection_distance).state < (id(radar_z2_end).state*2.54)))) {
+        return true;
+      } else {
+        return false;
+      }
+
+  - platform: template
+    name: "Radar Zone 3 Occupancy"
+    id: radar_zone_3_occupancy
+    device_class: occupancy
+    icon: mdi:motion-sensor
+    lambda: |-
+      if ((id(radar_has_target).state) && (((id(radar_z2_end).state*2.54) < id(radar_detection_distance).state) && (id(radar_detection_distance).state < (id(radar_z3_end).state*2.54)))) {
+        return true;
+      } else {
+        return false;
+      }
+
+ld2410:
+  id: ld2410_radar
+
+sensor:
+  - platform: internal_temperature
+    name: "ESP Temperature"
+    id: sys_esp_temperature
+
+  - platform: uptime
+    name: Uptime
+    id: sys_uptime
+    update_interval: 60s
+
+  - platform: wifi_signal
+    name: RSSI
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+
+  - platform: ld2410
+    moving_distance:
+      name: Radar Moving Distance
+      id: moving_distance
+    still_distance:
+      name: Radar Still Distance
+      id: still_distance
+    moving_energy:
+      name: Radar Move Energy
+      id: radar_moving_energy
+    still_energy:
+      name: Radar Still Energy
+      id: radar_still_energy
+    detection_distance:
+      name: Radar Detection Distance
+      id: radar_detection_distance
+    g0:
+      move_energy:
+        name: g0 move energy
+      still_energy:
+        name: g0 still energy
+    g1:
+      move_energy:
+        name: g1 move energy
+      still_energy:
+        name: g1 still energy
+    g2:
+      move_energy:
+        name: g2 move energy
+      still_energy:
+        name: g2 still energy
+    g3:
+      move_energy:
+        name: g3 move energy
+      still_energy:
+        name: g3 still energy
+    g4:
+      move_energy:
+        name: g4 move energy
+      still_energy:
+        name: g4 still energy
+    g5:
+      move_energy:
+        name: g5 move energy
+      still_energy:
+        name: g5 still energy
+    g6:
+      move_energy:
+        name: g6 move energy
+      still_energy:
+        name: g6 still energy
+    g7:
+      move_energy:
+        name: g7 move energy
+      still_energy:
+        name: g7 still energy
+    g8:
+      move_energy:
+        name: g8 move energy
+      still_energy:
+        name: g8 still energy
+    
+button:
+  - platform: ld2410
+    factory_reset:
+      name: "Factory Reset Radar"
+    restart:
+      name: "Restart Radar"
+    query_params:
+      name: query params
+
+switch:
+  - platform: ld2410
+    bluetooth:
+      name: "Radar Control Bluetooth"
+      id: radar_bluetooth
+    engineering_mode:
+      name: "Radar Engineering Mode"
+
+text_sensor:
+  - platform: ld2410
+    version:
+      name: "Radar Firmware Version"
+
+select:
+  - platform: ld2410
+    distance_resolution:
+      name: "Radar Distance Resolution"
+      disabled_by_default: true
